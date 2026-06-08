@@ -1,28 +1,176 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Solar System</title>
+    <title>Cosmos Explorer - 3D Solar System Simulation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Share+Tech+Mono&display=swap"
+        rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@4.2.0/fonts/remixicon.css" rel="stylesheet" />
     <link rel="stylesheet" href="style.css">
-    <style>
-        #gui-container {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            z-index: 10;
-        }
-    </style>
 </head>
+
 <body>
-    <div id="gui-container"></div>
-    <div><script type="module" src="./script.js"></script></div>
-    <div id="planetInfo" class="planet-info">
-        <div class="planet-info-content">
-            <span class="close-btn" onclick="closeInfo()">&times;</span>
-            <h2 id="planetName"></h2>
-            <p id="planetDetails"></p>
+    <!-- Background scanline grid effect -->
+    <div class="scanlines"></div>
+
+    <!-- App Header HUD -->
+    <header class="app-header">
+        <div class="tech-corner corner-tl"></div>
+        <div class="tech-corner corner-tr"></div>
+        <div class="tech-corner corner-bl"></div>
+        <div class="tech-corner corner-br"></div>
+
+        <div class="brand">
+            <i class="ri-planet-line logo-icon"></i>
+            <div class="brand-text">
+                <h1>Cosmos Explorer</h1>
+                <div class="telemetry-sub">
+                    <span>3D SOLAR SYSTEM SIMULATION</span>
+                </div>
+            </div>
+        </div>
+        <div class="header-actions">
+            <button class="hud-btn" id="btn-reset-view" onclick="closeInfo()"><i class="ri-restart-line"></i>
+                RESET_VIEW</button>
+            <button class="hud-btn toggle-settings" onclick="toggleSettingsPanel()"><i class="ri-equalizer-line"></i>
+                CONTROLS</button>
+        </div>
+    </header>
+
+    <!-- Floating Settings Panel -->
+    <div id="settingsPanel" class="settings-panel">
+        <div class="tech-corner corner-tl"></div>
+        <div class="tech-corner corner-tr"></div>
+        <div class="tech-corner corner-bl"></div>
+        <div class="tech-corner corner-br"></div>
+
+        <div class="panel-header">
+            <h3><i class="ri-equalizer-line"></i> SIMULATION_PARAMS</h3>
+            <button class="panel-close" onclick="toggleSettingsPanel()"><i class="ri-close-line"></i></button>
+        </div>
+
+        <div class="control-group">
+            <div class="label-wrap">
+                <label for="orbit-speed">ORBIT_SPEED</label>
+                <span id="orbit-speed-val" class="mono-value">1.0x</span>
+            </div>
+            <input type="range" id="orbit-speed" min="0" max="10" step="0.1" value="1">
+        </div>
+        <div class="control-group">
+            <div class="label-wrap">
+                <label for="rotation-speed">ROTATION_SPEED</label>
+                <span id="rotation-speed-val" class="mono-value">1.0x</span>
+            </div>
+            <input type="range" id="rotation-speed" min="0" max="10" step="0.1" value="1">
+        </div>
+        <div class="control-group">
+            <div class="label-wrap">
+                <label for="sun-intensity">SUN_INTENSITY</label>
+                <span id="sun-intensity-val" class="mono-value">1.9</span>
+            </div>
+            <input type="range" id="sun-intensity" min="1" max="10" step="0.1" value="1.9">
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="control-group checkbox-group">
+            <label class="switch">
+                <input type="checkbox" id="toggle-orbits" checked>
+                <span class="switch-slider"></span>
+            </label>
+            <span class="switch-label">SHOW ORBIT PATHS</span>
         </div>
     </div>
+
+    <!-- main canvas script injection point -->
+    <div>
+        <script type="module" src="./script.js"></script>
+    </div>
+
+    <!-- Planet Details Glassmorphic Card -->
+    <div id="planetInfo" class="planet-card">
+        <div class="tech-corner corner-tl"></div>
+        <div class="tech-corner corner-tr"></div>
+        <div class="tech-corner corner-bl"></div>
+        <div class="tech-corner corner-br"></div>
+
+        <div class="card-header">
+            <div class="planet-title-wrap">
+                <i class="ri-planet-line planet-icon"></i>
+                <h2 id="planetName"></h2>
+            </div>
+            <button class="close-card-btn" onclick="closeInfo()"><i class="ri-close-line"></i></button>
+        </div>
+        <div class="card-body">
+
+            <p id="planetSummary" class="planet-summary"></p>
+
+            <div class="metrics-grid">
+                <div class="metric-item">
+                    <span class="metric-label"><i class="ri-ruler-2-line"></i> RADIUS</span>
+                    <span class="metric-value" id="val-radius">-</span>
+                </div>
+                <div class="metric-item">
+                    <span class="metric-label"><i class="ri-compass-3-line"></i> TILT</span>
+                    <span class="metric-value" id="val-tilt">-</span>
+                </div>
+                <div class="metric-item">
+                    <span class="metric-label"><i class="ri-time-line"></i> ROTATION</span>
+                    <span class="metric-value" id="val-rotation">-</span>
+                </div>
+                <div class="metric-item">
+                    <span class="metric-label"><i class="ri-history-line"></i> ORBIT_PERIOD</span>
+                    <span class="metric-value" id="val-orbit">-</span>
+                </div>
+                <div class="metric-item">
+                    <span class="metric-label"><i class="ri-route-line"></i> DISTANCE</span>
+                    <span class="metric-value" id="val-distance">-</span>
+                </div>
+                <div class="metric-item">
+                    <span class="metric-label"><i class="ri-moon-line"></i> MOONS</span>
+                    <span class="metric-value" id="val-moons">-</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="bottom-dock">
+        <button class="dock-item" onclick="selectPlanetByName('Sun')">
+            <span class="dock-label">SUN</span>
+        </button>
+        <button class="dock-item" onclick="selectPlanetByName('Mercury')">
+            <span class="dock-label">MERCURY</span>
+        </button>
+        <button class="dock-item" onclick="selectPlanetByName('Venus')">
+            <span class="dock-label">VENUS</span>
+        </button>
+        <button class="dock-item" onclick="selectPlanetByName('Earth')">
+            <span class="dock-label">EARTH</span>
+        </button>
+        <button class="dock-item" onclick="selectPlanetByName('Mars')">
+            <span class="dock-label">MARS</span>
+        </button>
+        <button class="dock-item" onclick="selectPlanetByName('Jupiter')">
+            <span class="dock-label">JUPITER</span>
+        </button>
+        <button class="dock-item" onclick="selectPlanetByName('Saturn')">
+            <span class="dock-label">SATURN</span>
+        </button>
+        <button class="dock-item" onclick="selectPlanetByName('Uranus')">
+            <span class="dock-label">URANUS</span>
+        </button>
+        <button class="dock-item" onclick="selectPlanetByName('Neptune')">
+            <span class="dock-label">NEPTUNE</span>
+        </button>
+        <button class="dock-item" onclick="selectPlanetByName('Pluto')">
+            <span class="dock-label">PLUTO</span>
+        </button>
+    </div>
 </body>
+
 </html>

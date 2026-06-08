@@ -94,11 +94,6 @@ scene.background = cubeTextureLoader.load([
   bgTexture2
 ]);
 
-// ******  CONTROLS  ******
-const gui = new dat.GUI({ autoPlace: false });
-const customContainer = document.getElementById('gui-container');
-customContainer.appendChild(gui.domElement);
-
 // ****** SETTINGS FOR INTERACTIVE CONTROLS  ******
 const settings = {
   accelerationOrbit: 1,
@@ -106,20 +101,11 @@ const settings = {
   sunIntensity: 1.9
 };
 
-gui.add(settings, 'accelerationOrbit', 0, 10).onChange(value => {
-});
-gui.add(settings, 'acceleration', 0, 10).onChange(value => {
-});
-gui.add(settings, 'sunIntensity', 1, 10).onChange(value => {
-  sunMat.emissiveIntensity = value;
-});
-
 // mouse movement
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
 function onMouseMove(event) {
-    event.preventDefault();
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
 }
@@ -131,6 +117,9 @@ let targetCameraPosition = new THREE.Vector3();
 let offset;
 
 function onDocumentMouseDown(event) {
+  if (event.target !== renderer.domElement) {
+    return;
+  }
   event.preventDefault();
 
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -197,28 +186,59 @@ function identifyPlanet(clickedObject) {
 function showPlanetInfo(planet) {
   var info = document.getElementById('planetInfo');
   var name = document.getElementById('planetName');
-  var details = document.getElementById('planetDetails');
+  var summary = document.getElementById('planetSummary');
 
   name.innerText = planet;
-  details.innerText = `Radius: ${planetData[planet].radius}\nTilt: ${planetData[planet].tilt}\nRotation: ${planetData[planet].rotation}\nOrbit: ${planetData[planet].orbit}\nDistance: ${planetData[planet].distance}\nMoons: ${planetData[planet].moons}\nInfo: ${planetData[planet].info}`;
+  
+  if (planet === 'Sun') {
+    summary.innerText = "The star at the center of the Solar System, around which the Earth and other planets orbit.";
+    document.getElementById('val-radius').innerText = "696,340 km";
+    document.getElementById('val-tilt').innerText = "7.25°";
+    document.getElementById('val-rotation').innerText = "25-35 days";
+    document.getElementById('val-orbit').innerText = "N/A";
+    document.getElementById('val-distance').innerText = "0 km (Center)";
+    document.getElementById('val-moons').innerText = "8 (Planets)";
+  } else {
+    summary.innerText = planetData[planet].info;
+    document.getElementById('val-radius').innerText = planetData[planet].radius;
+    document.getElementById('val-tilt').innerText = planetData[planet].tilt;
+    document.getElementById('val-rotation').innerText = planetData[planet].rotation;
+    document.getElementById('val-orbit').innerText = planetData[planet].orbit;
+    document.getElementById('val-distance').innerText = planetData[planet].distance;
+    document.getElementById('val-moons').innerText = planetData[planet].moons;
+  }
 
-  info.style.display = 'block';
+  info.classList.add('active');
+
+  // Highlight active item in bottom dock
+  document.querySelectorAll('.dock-item').forEach(btn => {
+    if (btn.querySelector('.dock-label').innerText.trim().toLowerCase() === planet.toLowerCase()) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
 }
 let isZoomingOut = false;
 let zoomOutTargetPosition = new THREE.Vector3(-175, 115, 5);
 // close 'x' button function
 function closeInfo() {
   var info = document.getElementById('planetInfo');
-  info.style.display = 'none';
+  info.classList.remove('active');
   settings.accelerationOrbit = 1;
   isZoomingOut = true;
   controls.target.set(0, 0, 0);
+
+  // Remove highlights from bottom dock
+  document.querySelectorAll('.dock-item').forEach(btn => {
+    btn.classList.remove('active');
+  });
 }
 window.closeInfo = closeInfo;
 // close info when clicking another planet
 function closeInfoNoZoomOut() {
   var info = document.getElementById('planetInfo');
-  info.style.display = 'none';
+  info.classList.remove('active');
   settings.accelerationOrbit = 1;
 }
 // ******  SUN  ******
@@ -240,6 +260,8 @@ scene.add(pointLight);
 
 
 // ******  PLANET CREATION FUNCTION  ******
+const orbitLines = [];
+
 function createPlanet(planetName, size, position, tilt, texture, bump, ring, atmosphere, moons){
 
   let material;
@@ -285,6 +307,7 @@ function createPlanet(planetName, size, position, tilt, texture, bump, ring, atm
   const orbit = new THREE.LineLoop(orbitGeometry, orbitMaterial);
   orbit.rotation.x = Math.PI / 2;
   planetSystem.add(orbit);
+  orbitLines.push(orbit);
 
   //add ring
   if(ring)
@@ -781,6 +804,112 @@ if (isMovingTowardsPlanet) {
 loadAsteroids('/asteroids/asteroidPack.glb', 1000, 130, 160);
 loadAsteroids('/asteroids/asteroidPack.glb', 3000, 352, 370);
 animate();
+
+// ****** CUSTOM UI EVENT LISTENERS & BINDINGS ******
+
+// Settings panel toggling
+window.toggleSettingsPanel = function() {
+  const panel = document.getElementById('settingsPanel');
+  panel.classList.toggle('active');
+};
+
+// Slider inputs binding
+document.getElementById('orbit-speed').addEventListener('input', (e) => {
+  const val = parseFloat(e.target.value);
+  settings.accelerationOrbit = val;
+  document.getElementById('orbit-speed-val').innerText = val.toFixed(1) + 'x';
+});
+
+document.getElementById('rotation-speed').addEventListener('input', (e) => {
+  const val = parseFloat(e.target.value);
+  settings.acceleration = val;
+  document.getElementById('rotation-speed-val').innerText = val.toFixed(1) + 'x';
+});
+
+document.getElementById('sun-intensity').addEventListener('input', (e) => {
+  const val = parseFloat(e.target.value);
+  settings.sunIntensity = val;
+  if (sunMat) {
+    sunMat.emissiveIntensity = val;
+  }
+  document.getElementById('sun-intensity-val').innerText = val.toFixed(1);
+});
+
+document.getElementById('toggle-orbits').addEventListener('change', (e) => {
+  const visible = e.target.checked;
+  orbitLines.forEach(line => {
+    line.visible = visible;
+  });
+});
+
+// Expose global planet selection navigation dock helper
+window.selectPlanetByName = function(name) {
+  if (name === 'Sun') {
+    closeInfoNoZoomOut();
+    selectedPlanet = { name: 'Sun', planet: sun };
+    offset = 40;
+    
+    settings.accelerationOrbit = 0; // Stop orbital movement
+    
+    const planetPosition = new THREE.Vector3(0, 0, 0); // Sun is at origin
+    controls.target.copy(planetPosition);
+    camera.lookAt(planetPosition);
+    
+    targetCameraPosition.copy(planetPosition).add(camera.position.clone().sub(planetPosition).normalize().multiplyScalar(offset));
+    isMovingTowardsPlanet = true;
+    showPlanetInfo('Sun');
+    return;
+  }
+
+  // Find planet object matching name
+  const planetMap = {
+    'Mercury': mercury,
+    'Venus': venus,
+    'Earth': earth,
+    'Mars': mars,
+    'Jupiter': jupiter,
+    'Saturn': saturn,
+    'Uranus': uranus,
+    'Neptune': neptune,
+    'Pluto': pluto
+  };
+
+  const target = planetMap[name];
+  if (target) {
+    closeInfoNoZoomOut();
+    selectedPlanet = target;
+    
+    // Set appropriate offset
+    if (name === 'Mercury' || name === 'Pluto') offset = 10;
+    else if (name === 'Venus' || name === 'Earth' || name === 'Uranus') offset = 25;
+    else if (name === 'Mars') offset = 15;
+    else if (name === 'Jupiter' || name === 'Saturn') offset = 50;
+    else if (name === 'Neptune') offset = 20;
+
+    settings.accelerationOrbit = 0; // Stop orbital movement
+
+    const planetPosition = new THREE.Vector3();
+    selectedPlanet.planet.getWorldPosition(planetPosition);
+    controls.target.copy(planetPosition);
+    camera.lookAt(planetPosition);
+
+    targetCameraPosition.copy(planetPosition).add(camera.position.clone().sub(planetPosition).normalize().multiplyScalar(offset));
+    isMovingTowardsPlanet = true;
+  }
+};
+
+// Stop event propagation on UI panels to prevent camera orbiting/raycasting
+const uiContainers = ['.app-header', '.settings-panel', '.planet-card', '.bottom-dock'];
+uiContainers.forEach(selector => {
+  const el = document.querySelector(selector);
+  if (el) {
+    ['mousedown', 'touchstart', 'pointerdown', 'click', 'mousemove', 'touchmove', 'pointermove'].forEach(eventType => {
+      el.addEventListener(eventType, (e) => {
+        e.stopPropagation();
+      });
+    });
+  }
+});
 
 window.addEventListener('mousemove', onMouseMove, false);
 window.addEventListener('mousedown', onDocumentMouseDown, false);
