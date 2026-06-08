@@ -35,6 +35,7 @@
             </div>
         </div>
         <div class="header-actions">
+            <button class="hud-btn" id="btn-flight-mode" onclick="toggleFlightMode()"><i class="ri-rocket-line"></i> FLIGHT_MODE</button>
             <button class="hud-btn" id="btn-reset-view" onclick="closeInfo()"><i class="ri-restart-line"></i>
                 RESET_VIEW</button>
             <button class="hud-btn toggle-settings" onclick="toggleSettingsPanel()"><i class="ri-equalizer-line"></i>
@@ -170,6 +171,70 @@
         <button class="dock-item" onclick="selectPlanetByName('Pluto')">
             <span class="dock-label">PLUTO</span>
         </button>
+    </div>
+
+    <!-- Spaceship Flight HUD -->
+    <div id="flightHud" class="flight-hud">
+        <!-- Center Targeting Reticle -->
+        <div class="reticle-container">
+            <div class="reticle-ring ring-outer"></div>
+            <div class="reticle-ring ring-inner"></div>
+            <div class="reticle-crosshair"></div>
+            <div class="reticle-brackets"></div>
+        </div>
+
+        <!-- Telemetry HUD Panels -->
+        <div class="flight-telemetry-left">
+            <div class="tech-corner corner-tl"></div>
+            <div class="tech-corner corner-tr"></div>
+            <div class="tech-corner corner-bl"></div>
+            <div class="tech-corner corner-br"></div>
+            <div class="telemetry-label">PROPULSION // SYSTEM</div>
+            <div class="telemetry-row">
+                <span>SPEED:</span>
+                <span id="flight-speed" class="mono-value">0.00 km/s</span>
+            </div>
+            <div class="telemetry-row">
+                <span>THRUST:</span>
+                <span id="flight-thrust" class="mono-value">0%</span>
+            </div>
+            <div class="thrust-bar-container">
+                <div id="flight-thrust-bar" class="thrust-bar"></div>
+            </div>
+        </div>
+
+        <div class="flight-telemetry-right">
+            <div class="tech-corner corner-tl"></div>
+            <div class="tech-corner corner-tr"></div>
+            <div class="tech-corner corner-bl"></div>
+            <div class="tech-corner corner-br"></div>
+            <div class="telemetry-label">NAV_TELEMETRY // COORDINATES</div>
+            <div class="telemetry-row">
+                <span>COORD X:</span>
+                <span id="flight-coord-x" class="mono-value">0.00</span>
+            </div>
+            <div class="telemetry-row">
+                <span>COORD Y:</span>
+                <span id="flight-coord-y" class="mono-value">0.00</span>
+            </div>
+            <div class="telemetry-row">
+                <span>COORD Z:</span>
+                <span id="flight-coord-z" class="mono-value">0.00</span>
+            </div>
+        </div>
+
+        <div class="flight-instructions">
+            <div class="tech-corner corner-tl"></div>
+            <div class="tech-corner corner-tr"></div>
+            <div class="tech-corner corner-bl"></div>
+            <div class="tech-corner corner-br"></div>
+            <div class="instructions-title"><i class="ri-terminal-box-line"></i> PILOT_GUIDE</div>
+            <div class="instructions-row"><span>W / S</span><span>THRUST / REVERSE</span></div>
+            <div class="instructions-row"><span>A / D</span><span>YAW (STEER L/R)</span></div>
+            <div class="instructions-row"><span>Q / E</span><span>ROLL (TILT L/R)</span></div>
+            <div class="instructions-row"><span>MOUSE DRAG</span><span>PITCH (NOSE UP/DOWN)</span></div>
+            <div class="instructions-row"><span>SHIFT</span><span>BOOST THRUST</span></div>
+        </div>
     </div>
 </body>
 

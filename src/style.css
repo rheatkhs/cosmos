@@ -567,6 +567,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
     clip-path: polygon(20px 0%, calc(100% - 20px) 0%, 100% 100%, 0% 100%);
     max-width: 90vw;
     overflow-x: auto;
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease;
 }
 
 .bottom-dock::-webkit-scrollbar {
@@ -709,5 +710,276 @@ input[type="range"]::-webkit-slider-thumb:hover {
     .dock-label {
         display: inline;
         font-size: 10px;
+    }
+}
+
+/* =========================================
+   Spaceship Flight HUD Styling
+   ========================================= */
+.flight-hud {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 5;
+    pointer-events: none; /* Let canvas drag events pass through */
+    opacity: 0;
+    transition: opacity 0.5s ease;
+}
+
+body.in-flight-mode .flight-hud {
+    opacity: 1;
+}
+
+/* Hide other HUD panels in flight mode */
+body.in-flight-mode .settings-panel {
+    transform: translateX(120%) !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+body.in-flight-mode .planet-card {
+    transform: translateX(-120%) !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+body.in-flight-mode .bottom-dock {
+    transform: translate(-50%, 120%) !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+/* Center Targeting Reticle */
+.reticle-container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 120px;
+    height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.reticle-ring {
+    position: absolute;
+    border: 1px dashed rgba(0, 240, 255, 0.3);
+    border-radius: 50%;
+    transition: all 0.3s ease;
+}
+
+.ring-outer {
+    width: 100px;
+    height: 100px;
+    animation: radar-spin 20s linear infinite;
+}
+
+.ring-inner {
+    width: 60px;
+    height: 60px;
+    border-style: solid;
+    border-color: rgba(0, 240, 255, 0.15) transparent;
+    animation: radar-spin 8s linear infinite reverse;
+}
+
+.reticle-crosshair {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+}
+
+.reticle-crosshair::before,
+.reticle-crosshair::after {
+    content: '';
+    position: absolute;
+    background: var(--color-accent);
+    box-shadow: 0 0 8px var(--color-accent);
+}
+
+.reticle-crosshair::before {
+    top: 5px;
+    left: 0;
+    width: 12px;
+    height: 2px;
+}
+
+.reticle-crosshair::after {
+    top: 0;
+    left: 5px;
+    width: 2px;
+    height: 12px;
+}
+
+.reticle-brackets {
+    position: absolute;
+    width: 120px;
+    height: 120px;
+}
+
+.reticle-brackets::before,
+.reticle-brackets::after {
+    content: '';
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(0, 240, 255, 0.4);
+}
+
+.reticle-brackets::before {
+    top: 0;
+    left: 0;
+    border-right: none;
+    border-bottom: none;
+}
+
+.reticle-brackets::after {
+    bottom: 0;
+    right: 0;
+    border-left: none;
+    border-top: none;
+}
+
+/* Flight Telemetry Cards */
+.flight-telemetry-left,
+.flight-telemetry-right,
+.flight-instructions {
+    position: absolute;
+    background: rgba(6, 10, 16, 0.88);
+    border: 1px solid rgba(0, 240, 255, 0.15);
+    box-shadow: 0 0 20px rgba(0, 240, 255, 0.05);
+    padding: 16px;
+    font-family: var(--font-hud);
+    color: #fff;
+    pointer-events: auto; /* Allow interaction if needed */
+}
+
+.flight-telemetry-left {
+    left: 30px;
+    bottom: 30px;
+    width: 240px;
+}
+
+.flight-telemetry-right {
+    right: 30px;
+    bottom: 30px;
+    width: 280px;
+}
+
+.flight-instructions {
+    left: 30px;
+    top: 100px;
+    width: 280px;
+    margin-top: 20px;
+}
+
+.telemetry-label {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: var(--color-accent);
+    margin-bottom: 12px;
+    border-bottom: 1px solid rgba(0, 240, 255, 0.1);
+    padding-bottom: 4px;
+}
+
+.telemetry-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.thrust-bar-container {
+    width: 100%;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(0, 240, 255, 0.1);
+    margin-top: 10px;
+    overflow: hidden;
+    position: relative;
+}
+
+.thrust-bar {
+    width: 0%;
+    height: 100%;
+    background: var(--color-accent);
+    box-shadow: 0 0 8px var(--color-accent);
+    transition: width 0.1s ease;
+}
+
+.instructions-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: var(--color-accent);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.instructions-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    font-size: 10px;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.03);
+    padding-bottom: 4px;
+}
+
+.instructions-row span:first-child {
+    font-family: var(--font-telemetry);
+    color: #fff;
+    background: rgba(0, 240, 255, 0.1);
+    padding: 1px 6px;
+    border-radius: 2px;
+    border: 1px solid rgba(0, 240, 255, 0.15);
+}
+
+.instructions-row span:last-child {
+    color: var(--text-secondary);
+}
+
+/* Adjust active button styling for Flight Mode */
+.hud-btn.active-flight {
+    background: rgba(255, 59, 48, 0.15) !important;
+    border-color: #ff3b30 !important;
+    color: #ff3b30 !important;
+    box-shadow: 0 0 10px rgba(255, 59, 48, 0.3) !important;
+}
+
+/* Responsive adjustments for flight HUD */
+@media (max-width: 900px) {
+    .flight-instructions {
+        display: none; /* Hide instructions on small screens to save space */
+    }
+    .flight-telemetry-left {
+        left: 10px;
+        bottom: 10px;
+        width: 160px;
+        padding: 10px;
+    }
+    .flight-telemetry-right {
+        right: 10px;
+        bottom: 10px;
+        width: 180px;
+        padding: 10px;
+    }
+    .reticle-container {
+        width: 80px;
+        height: 80px;
+    }
+    .ring-outer {
+        width: 70px;
+        height: 70px;
+    }
+    .ring-inner {
+        width: 40px;
+        height: 40px;
     }
 }

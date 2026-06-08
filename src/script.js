@@ -116,7 +116,37 @@ let isMovingTowardsPlanet = false;
 let targetCameraPosition = new THREE.Vector3();
 let offset;
 
+// Spaceship Flight Mode state
+let isFlightMode = false;
+let flightSpeed = 0;
+const maxSpeed = 3.0;
+const boostMaxSpeed = 8.0;
+const acceleration = 0.05;
+const drag = 0.96;
+
+let pitchSpeed = 0;
+let yawSpeed = 0;
+let rollSpeed = 0;
+const rotAcceleration = 0.0015;
+const rotDrag = 0.88;
+
+const keysPressed = {
+  w: false,
+  s: false,
+  a: false,
+  d: false,
+  q: false,
+  e: false,
+  Shift: false,
+  ArrowUp: false,
+  ArrowDown: false
+};
+
+let isMouseDown = false;
+let prevMousePosition = { x: 0, y: 0 };
+
 function onDocumentMouseDown(event) {
+  if (isFlightMode) return;
   if (event.target !== renderer.domElement) {
     return;
   }
@@ -226,8 +256,10 @@ function closeInfo() {
   var info = document.getElementById('planetInfo');
   info.classList.remove('active');
   settings.accelerationOrbit = 1;
-  isZoomingOut = true;
-  controls.target.set(0, 0, 0);
+  if (!isFlightMode) {
+    isZoomingOut = true;
+    controls.target.set(0, 0, 0);
+  }
 
   // Remove highlights from bottom dock
   document.querySelectorAll('.dock-item').forEach(btn => {
@@ -779,27 +811,97 @@ if (intersects.length > 0) {
   }
 }
 // ******  ZOOM IN/OUT  ******
-if (isMovingTowardsPlanet) {
-  // Smoothly move the camera towards the target position
-  camera.position.lerp(targetCameraPosition, 0.03);
+if (!isFlightMode) {
+  if (isMovingTowardsPlanet) {
+    // Smoothly move the camera towards the target position
+    camera.position.lerp(targetCameraPosition, 0.03);
 
-  // Check if the camera is close to the target position
-  if (camera.position.distanceTo(targetCameraPosition) < 1) {
-      isMovingTowardsPlanet = false;
-      showPlanetInfo(selectedPlanet.name);
+    // Check if the camera is close to the target position
+    if (camera.position.distanceTo(targetCameraPosition) < 1) {
+        isMovingTowardsPlanet = false;
+        showPlanetInfo(selectedPlanet.name);
+    }
+  } else if (isZoomingOut) {
+    camera.position.lerp(zoomOutTargetPosition, 0.05);
 
+    if (camera.position.distanceTo(zoomOutTargetPosition) < 1) {
+        isZoomingOut = false;
+    }
   }
-} else if (isZoomingOut) {
-  camera.position.lerp(zoomOutTargetPosition, 0.05);
-
-  if (camera.position.distanceTo(zoomOutTargetPosition) < 1) {
-      isZoomingOut = false;
+  controls.update();
+} else {
+  // 1. Process movement speed
+  const currentMax = keysPressed.Shift ? boostMaxSpeed : maxSpeed;
+  if (keysPressed.w) {
+    flightSpeed = THREE.MathUtils.lerp(flightSpeed, currentMax, acceleration);
+  } else if (keysPressed.s) {
+    flightSpeed = THREE.MathUtils.lerp(flightSpeed, -currentMax * 0.4, acceleration);
+  } else {
+    flightSpeed *= drag;
+    if (Math.abs(flightSpeed) < 0.001) flightSpeed = 0;
   }
+
+  // 2. Process Pitch, Yaw, Roll rotations
+  // Keyboard steering inputs
+  if (keysPressed.ArrowUp) {
+    pitchSpeed = THREE.MathUtils.lerp(pitchSpeed, 0.012, rotAcceleration * 10);
+  } else if (keysPressed.ArrowDown) {
+    pitchSpeed = THREE.MathUtils.lerp(pitchSpeed, -0.012, rotAcceleration * 10);
+  }
+  
+  if (keysPressed.a) {
+    yawSpeed = THREE.MathUtils.lerp(yawSpeed, 0.015, rotAcceleration * 10);
+  } else if (keysPressed.d) {
+    yawSpeed = THREE.MathUtils.lerp(yawSpeed, -0.015, rotAcceleration * 10);
+  }
+
+  if (keysPressed.q) {
+    rollSpeed = THREE.MathUtils.lerp(rollSpeed, 0.015, rotAcceleration * 10);
+  } else if (keysPressed.e) {
+    rollSpeed = THREE.MathUtils.lerp(rollSpeed, -0.015, rotAcceleration * 10);
+  }
+
+  // Apply rotation dampening (drag)
+  pitchSpeed *= rotDrag;
+  yawSpeed *= rotDrag;
+  rollSpeed *= rotDrag;
+
+  // Apply rotations
+  camera.rotateX(pitchSpeed);
+  camera.rotateY(yawSpeed);
+  camera.rotateZ(rollSpeed);
+
+  // 3. Translate camera along its local direction vector
+  const direction = new THREE.Vector3();
+  camera.getWorldDirection(direction);
+  camera.position.addScaledVector(direction, flightSpeed);
+
+  // 4. Update Cockpit HUD UI values
+  const speedDisplay = (Math.abs(flightSpeed) * 200).toFixed(1);
+  const flightSpeedEl = document.getElementById('flight-speed');
+  if (flightSpeedEl) flightSpeedEl.innerText = speedDisplay + ' km/s';
+  
+  const maxReference = keysPressed.Shift ? boostMaxSpeed : maxSpeed;
+  const thrustPercent = Math.round((Math.max(0, flightSpeed) / maxReference) * 100);
+  
+  const flightThrustEl = document.getElementById('flight-thrust');
+  if (flightThrustEl) flightThrustEl.innerText = thrustPercent + '%';
+  
+  const flightThrustBarEl = document.getElementById('flight-thrust-bar');
+  if (flightThrustBarEl) flightThrustBarEl.style.width = thrustPercent + '%';
+
+  const flightCoordXEl = document.getElementById('flight-coord-x');
+  if (flightCoordXEl) flightCoordXEl.innerText = camera.position.x.toFixed(1);
+  
+  const flightCoordYEl = document.getElementById('flight-coord-y');
+  if (flightCoordYEl) flightCoordYEl.innerText = camera.position.y.toFixed(1);
+  
+  const flightCoordZEl = document.getElementById('flight-coord-z');
+  if (flightCoordZEl) flightCoordZEl.innerText = camera.position.z.toFixed(1);
 }
 
-  controls.update();
-  requestAnimationFrame(animate);
-  composer.render();
+requestAnimationFrame(animate);
+composer.render();
 }
 loadAsteroids('/asteroids/asteroidPack.glb', 1000, 130, 160);
 loadAsteroids('/asteroids/asteroidPack.glb', 3000, 352, 370);
@@ -918,4 +1020,122 @@ window.addEventListener('resize', function(){
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth,window.innerHeight);
   composer.setSize(window.innerWidth,window.innerHeight);
+});
+
+// ====== SPACESHIP FLIGHT CONTROL LISTENERS ======
+
+// Toggle function
+window.toggleFlightMode = function() {
+  isFlightMode = !isFlightMode;
+  const btn = document.getElementById('btn-flight-mode');
+  
+  if (isFlightMode) {
+    document.body.classList.add('in-flight-mode');
+    if (btn) {
+      btn.classList.add('active-flight');
+      btn.innerHTML = '<i class="ri-close-line"></i> EXIT_FLIGHT';
+    }
+    controls.enabled = false;
+    
+    // Close active details card
+    closeInfo();
+  } else {
+    document.body.classList.remove('in-flight-mode');
+    if (btn) {
+      btn.classList.remove('active-flight');
+      btn.innerHTML = '<i class="ri-rocket-line"></i> FLIGHT_MODE';
+    }
+    controls.enabled = true;
+    
+    // Smooth reset of OrbitControls target in front of camera
+    const lookTarget = new THREE.Vector3();
+    camera.getWorldDirection(lookTarget);
+    lookTarget.multiplyScalar(50).add(camera.position);
+    controls.target.copy(lookTarget);
+    controls.update();
+  }
+};
+
+// Keyboard inputs keydown
+window.addEventListener('keydown', (e) => {
+  if (!isFlightMode) return;
+  
+  const key = e.key.toLowerCase();
+  if (key === 'w') keysPressed.w = true;
+  if (key === 's') keysPressed.s = true;
+  if (key === 'a') keysPressed.a = true;
+  if (key === 'd') keysPressed.d = true;
+  if (key === 'q') keysPressed.q = true;
+  if (key === 'e') keysPressed.e = true;
+  if (e.key === 'Shift') keysPressed.Shift = true;
+  
+  if (e.key === 'ArrowUp') keysPressed.ArrowUp = true;
+  if (e.key === 'ArrowDown') keysPressed.ArrowDown = true;
+});
+
+// Keyboard inputs keyup
+window.addEventListener('keyup', (e) => {
+  if (!isFlightMode) return;
+  
+  const key = e.key.toLowerCase();
+  if (key === 'w') keysPressed.w = false;
+  if (key === 's') keysPressed.s = false;
+  if (key === 'a') keysPressed.a = false;
+  if (key === 'd') keysPressed.d = false;
+  if (key === 'q') keysPressed.q = false;
+  if (key === 'e') keysPressed.e = false;
+  if (e.key === 'Shift') keysPressed.Shift = false;
+  
+  if (e.key === 'ArrowUp') keysPressed.ArrowUp = false;
+  if (e.key === 'ArrowDown') keysPressed.ArrowDown = false;
+});
+
+// Mouse dragging controls for flight steering
+window.addEventListener('mousedown', (e) => {
+  if (!isFlightMode || e.target !== renderer.domElement) return;
+  isMouseDown = true;
+  prevMousePosition = { x: e.clientX, y: e.clientY };
+});
+
+window.addEventListener('mousemove', (e) => {
+  if (!isFlightMode || !isMouseDown) return;
+  
+  const deltaX = e.clientX - prevMousePosition.x;
+  const deltaY = e.clientY - prevMousePosition.y;
+  
+  // Update pitch/yaw speeds based on mouse dragging offsets
+  pitchSpeed -= deltaY * 0.00015;
+  yawSpeed -= deltaX * 0.00015;
+  
+  prevMousePosition = { x: e.clientX, y: e.clientY };
+});
+
+window.addEventListener('mouseup', () => {
+  isMouseDown = false;
+});
+
+// Touch controls support for mobile flight steering
+window.addEventListener('touchstart', (e) => {
+  if (!isFlightMode || e.target !== renderer.domElement) return;
+  if (e.touches.length > 0) {
+    isMouseDown = true;
+    prevMousePosition = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  }
+}, { passive: true });
+
+window.addEventListener('touchmove', (e) => {
+  if (!isFlightMode || !isMouseDown) return;
+  if (e.touches.length > 0) {
+    const deltaX = e.touches[0].clientX - prevMousePosition.x;
+    const deltaY = e.touches[0].clientY - prevMousePosition.y;
+    
+    pitchSpeed -= deltaY * 0.0002;
+    yawSpeed -= deltaX * 0.0002;
+    
+    prevMousePosition = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  }
+}, { passive: true });
+
+window.addEventListener('touchend', () => {
+  isMouseDown = false;
 });
