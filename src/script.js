@@ -145,6 +145,84 @@ const keysPressed = {
 let isMouseDown = false;
 let prevMousePosition = { x: 0, y: 0 };
 
+// ====== HYPERSPACE WARP STATE ======
+let isWarping = false;
+let warpProgress = 0;
+let warpStartPos = new THREE.Vector3();
+let warpEndPos = new THREE.Vector3();
+let warpTargetPlanetObj = null;
+let warpOriginalBloomRadius = 0.9;
+let warpOriginalBloomStrength = 1.0;
+let warpApproachDir = new THREE.Vector3();
+let streakScale = 1.0;
+
+let flightLockedTarget = null;
+
+function lockFlightTarget(name) {
+  const planetMap = {
+    'Sun': { name: 'Sun', planet: sun },
+    'Mercury': mercury,
+    'Venus': venus,
+    'Earth': earth,
+    'Mars': mars,
+    'Jupiter': jupiter,
+    'Saturn': saturn,
+    'Uranus': uranus,
+    'Neptune': neptune,
+    'Pluto': pluto
+  };
+
+  const target = planetMap[name];
+  if (target) {
+    flightLockedTarget = target;
+    const el = document.getElementById('flight-target');
+    if (el) el.innerText = name.toUpperCase();
+    
+    const warpBtn = document.getElementById('btn-warp-hud');
+    if (warpBtn) warpBtn.disabled = false;
+  }
+}
+
+// ====== HYPERSPACE PARTICLE SYSTEM ======
+const warpParticleCount = 800;
+const warpGeometry = new THREE.BufferGeometry();
+const warpPositions = new Float32Array(warpParticleCount * 6);
+const warpOriginalLengths = new Float32Array(warpParticleCount);
+
+for (let i = 0; i < warpParticleCount; i++) {
+  const angle = Math.random() * Math.PI * 2;
+  const radius = 5 + Math.random() * 60;
+  const x = Math.cos(angle) * radius;
+  const y = Math.sin(angle) * radius;
+  const z = Math.random() * -300;
+  
+  const lineLength = 5 + Math.random() * 25;
+  warpOriginalLengths[i] = lineLength;
+  
+  // Vertex 1 (Start)
+  warpPositions[i * 6 + 0] = x;
+  warpPositions[i * 6 + 1] = y;
+  warpPositions[i * 6 + 2] = z;
+  
+  // Vertex 2 (End)
+  warpPositions[i * 6 + 3] = x;
+  warpPositions[i * 6 + 4] = y;
+  warpPositions[i * 6 + 5] = z - lineLength;
+}
+
+warpGeometry.setAttribute('position', new THREE.BufferAttribute(warpPositions, 3));
+const warpMaterial = new THREE.LineBasicMaterial({
+  color: 0x00f0ff,
+  transparent: true,
+  opacity: 0,
+  blending: THREE.AdditiveBlending,
+  linewidth: 1
+});
+
+const warpLines = new THREE.LineSegments(warpGeometry, warpMaterial);
+warpLines.visible = false;
+scene.add(warpLines);
+
 function onDocumentMouseDown(event) {
   if (isFlightMode) return;
   if (event.target !== renderer.domElement) {
@@ -160,20 +238,12 @@ function onDocumentMouseDown(event) {
 
   if (intersects.length > 0) {
     const clickedObject = intersects[0].object;
-    selectedPlanet = identifyPlanet(clickedObject);
-    if (selectedPlanet) {
+    const clickedPlanet = identifyPlanet(clickedObject);
+    if (clickedPlanet) {
+      if (isWarping) return;
       closeInfoNoZoomOut();
-      
-      settings.accelerationOrbit = 0; // Stop orbital movement
-
-      // Update camera to look at the selected planet
-      const planetPosition = new THREE.Vector3();
-      selectedPlanet.planet.getWorldPosition(planetPosition);
-      controls.target.copy(planetPosition);
-      camera.lookAt(planetPosition); // Orient the camera towards the planet
-
-      targetCameraPosition.copy(planetPosition).add(camera.position.clone().sub(planetPosition).normalize().multiplyScalar(offset));
-      isMovingTowardsPlanet = true;
+      selectedPlanet = clickedPlanet;
+      triggerWarpJump();
     }
   }
 }
@@ -811,7 +881,145 @@ if (intersects.length > 0) {
   }
 }
 // ******  ZOOM IN/OUT  ******
-if (!isFlightMode) {
+if (isWarping) {
+  warpProgress += 0.007; // ~2.4 seconds duration at 60fps
+  if (warpProgress > 1.0) warpProgress = 1.0;
+
+  // Orient camera to face the target planet
+  const targetPos = new THREE.Vector3();
+  if (warpTargetPlanetObj.name === 'Sun') {
+    targetPos.set(0, 0, 0);
+  } else {
+    warpTargetPlanetObj.planet.getWorldPosition(targetPos);
+  }
+  
+  camera.lookAt(targetPos);
+
+  // Position warp lines system to center on camera and orient in camera's direction
+  warpLines.position.copy(camera.position);
+  warpLines.quaternion.copy(camera.quaternion);
+
+  // Phase 1: Initiating/charging warp (0.0 to 0.15 progress)
+  if (warpProgress <= 0.15) {
+    const t = warpProgress / 0.15;
+    
+    // Stretch lines
+    streakScale = THREE.MathUtils.lerp(1.0, 15.0, t);
+    warpMaterial.opacity = THREE.MathUtils.lerp(0.0, 1.0, t);
+    
+    // Bending FOV
+    camera.fov = THREE.MathUtils.lerp(45, 105, t);
+    camera.updateProjectionMatrix();
+    
+    // Increase Bloom intensity
+    bloomPass.strength = THREE.MathUtils.lerp(1.0, 4.5, t);
+    bloomPass.radius = THREE.MathUtils.lerp(0.9, 1.5, t);
+    
+    // Slow initial movement
+    camera.position.lerpVectors(warpStartPos, warpEndPos, warpProgress * 0.2);
+  }
+  // Phase 2: Main Cruise warp speed (0.15 to 0.85 progress)
+  else if (warpProgress > 0.15 && warpProgress <= 0.85) {
+    streakScale = 15.0;
+    warpMaterial.opacity = 1.0;
+    camera.fov = 105;
+    camera.updateProjectionMatrix();
+    bloomPass.strength = 4.5;
+    bloomPass.radius = 1.5;
+    
+    const t = (warpProgress - 0.15) / 0.7;
+    const easedT = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    camera.position.lerpVectors(warpStartPos, warpEndPos, easedT);
+  }
+  // Phase 3: Transition Peak and deceleration (0.85 to 0.92 progress)
+  else if (warpProgress > 0.85 && warpProgress <= 0.92) {
+    const t = (warpProgress - 0.85) / 0.07;
+    
+    camera.position.lerpVectors(warpStartPos, warpEndPos, 0.95 + t * 0.05);
+    
+    const overlay = document.getElementById('warpOverlay');
+    if (overlay && !overlay.classList.contains('active-flash')) {
+      overlay.classList.add('active-flash');
+    }
+  }
+  // Phase 4: Decelerating exit (0.92 to 1.0 progress)
+  else {
+    const t = (warpProgress - 0.92) / 0.08;
+    
+    const overlay = document.getElementById('warpOverlay');
+    if (overlay && overlay.classList.contains('active-flash')) {
+      overlay.classList.remove('active-flash');
+    }
+    
+    streakScale = THREE.MathUtils.lerp(15.0, 1.0, t);
+    warpMaterial.opacity = THREE.MathUtils.lerp(1.0, 0.0, t);
+    
+    camera.fov = THREE.MathUtils.lerp(105, 45, t);
+    camera.updateProjectionMatrix();
+    
+    bloomPass.strength = THREE.MathUtils.lerp(4.5, warpOriginalBloomStrength, t);
+    bloomPass.radius = THREE.MathUtils.lerp(1.5, warpOriginalBloomRadius, t);
+  }
+
+  // Update particle vertices to streak past
+  const posAttribute = warpGeometry.attributes.position;
+  const positions = posAttribute.array;
+  
+  let currentWarpSpeed = 2.0;
+  if (warpProgress > 0.15 && warpProgress <= 0.85) {
+    currentWarpSpeed = 22.0;
+  } else if (warpProgress > 0.85) {
+    currentWarpSpeed = 2.0;
+  }
+  
+  for (let i = 0; i < warpParticleCount; i++) {
+    positions[i * 6 + 2] += currentWarpSpeed; 
+    
+    if (positions[i * 6 + 2] > 20) {
+      const lineLength = 5 + Math.random() * 25;
+      const newZ = -300 - Math.random() * 50;
+      positions[i * 6 + 2] = newZ;
+    }
+    
+    const length = warpOriginalLengths[i] * streakScale;
+    positions[i * 6 + 5] = positions[i * 6 + 2] - length;
+  }
+  posAttribute.needsUpdate = true;
+
+  // Update HUD coordinate values during warp
+  const flightCoordXEl = document.getElementById('flight-coord-x');
+  if (flightCoordXEl) flightCoordXEl.innerText = camera.position.x.toFixed(1);
+  const flightCoordYEl = document.getElementById('flight-coord-y');
+  if (flightCoordYEl) flightCoordYEl.innerText = camera.position.y.toFixed(1);
+  const flightCoordZEl = document.getElementById('flight-coord-z');
+  if (flightCoordZEl) flightCoordZEl.innerText = camera.position.z.toFixed(1);
+
+  if (warpProgress >= 1.0) {
+    isWarping = false;
+    warpLines.visible = false;
+    
+    camera.fov = 45;
+    camera.updateProjectionMatrix();
+    
+    bloomPass.strength = warpOriginalBloomStrength;
+    bloomPass.radius = warpOriginalBloomRadius;
+    
+    camera.position.copy(warpEndPos);
+    
+    if (isFlightMode) {
+      controls.enabled = false;
+    } else {
+      selectedPlanet = warpTargetPlanetObj;
+      isMovingTowardsPlanet = false;
+      
+      controls.enabled = true;
+      controls.target.copy(targetPos);
+      controls.update();
+      
+      showPlanetInfo(warpTargetPlanetObj.name);
+    }
+  }
+} else if (!isFlightMode) {
   if (isMovingTowardsPlanet) {
     // Smoothly move the camera towards the target position
     camera.position.lerp(targetCameraPosition, 0.03);
@@ -946,20 +1154,12 @@ document.getElementById('toggle-orbits').addEventListener('change', (e) => {
 
 // Expose global planet selection navigation dock helper
 window.selectPlanetByName = function(name) {
+  if (isWarping) return;
+
   if (name === 'Sun') {
     closeInfoNoZoomOut();
     selectedPlanet = { name: 'Sun', planet: sun };
-    offset = 40;
-    
-    settings.accelerationOrbit = 0; // Stop orbital movement
-    
-    const planetPosition = new THREE.Vector3(0, 0, 0); // Sun is at origin
-    controls.target.copy(planetPosition);
-    camera.lookAt(planetPosition);
-    
-    targetCameraPosition.copy(planetPosition).add(camera.position.clone().sub(planetPosition).normalize().multiplyScalar(offset));
-    isMovingTowardsPlanet = true;
-    showPlanetInfo('Sun');
+    triggerWarpJump();
     return;
   }
 
@@ -980,23 +1180,7 @@ window.selectPlanetByName = function(name) {
   if (target) {
     closeInfoNoZoomOut();
     selectedPlanet = target;
-    
-    // Set appropriate offset
-    if (name === 'Mercury' || name === 'Pluto') offset = 10;
-    else if (name === 'Venus' || name === 'Earth' || name === 'Uranus') offset = 25;
-    else if (name === 'Mars') offset = 15;
-    else if (name === 'Jupiter' || name === 'Saturn') offset = 50;
-    else if (name === 'Neptune') offset = 20;
-
-    settings.accelerationOrbit = 0; // Stop orbital movement
-
-    const planetPosition = new THREE.Vector3();
-    selectedPlanet.planet.getWorldPosition(planetPosition);
-    controls.target.copy(planetPosition);
-    camera.lookAt(planetPosition);
-
-    targetCameraPosition.copy(planetPosition).add(camera.position.clone().sub(planetPosition).normalize().multiplyScalar(offset));
-    isMovingTowardsPlanet = true;
+    triggerWarpJump();
   }
 };
 
@@ -1039,6 +1223,13 @@ window.toggleFlightMode = function() {
     
     // Close active details card
     closeInfo();
+
+    // Reset Flight locks
+    flightLockedTarget = null;
+    const el = document.getElementById('flight-target');
+    if (el) el.innerText = 'NONE';
+    const warpBtn = document.getElementById('btn-warp-hud');
+    if (warpBtn) warpBtn.disabled = true;
   } else {
     document.body.classList.remove('in-flight-mode');
     if (btn) {
@@ -1061,6 +1252,35 @@ window.addEventListener('keydown', (e) => {
   if (!isFlightMode) return;
   
   const key = e.key.toLowerCase();
+  
+  // Numerical target selection (1-9, 0)
+  if (key >= '0' && key <= '9') {
+    const targetMap = {
+      '1': 'Sun',
+      '2': 'Mercury',
+      '3': 'Venus',
+      '4': 'Earth',
+      '5': 'Mars',
+      '6': 'Jupiter',
+      '7': 'Saturn',
+      '8': 'Uranus',
+      '9': 'Neptune',
+      '0': 'Pluto'
+    };
+    const name = targetMap[key];
+    if (name) {
+      lockFlightTarget(name);
+    }
+  }
+
+  // Spacebar to trigger warp
+  if (e.key === ' ' || e.code === 'Space') {
+    e.preventDefault(); // Prevent page scroll
+    if (flightLockedTarget && !isWarping) {
+      triggerWarpJump();
+    }
+  }
+
   if (key === 'w') keysPressed.w = true;
   if (key === 's') keysPressed.s = true;
   if (key === 'a') keysPressed.a = true;
@@ -1139,3 +1359,71 @@ window.addEventListener('touchmove', (e) => {
 window.addEventListener('touchend', () => {
   isMouseDown = false;
 });
+
+// ====== TRIGGER HYPERSPACE WARP JUMP FUNCTION ======
+window.triggerWarpJump = function() {
+  if (isWarping) return;
+  
+  // Identify the target planet
+  let targetObj = null;
+  if (isFlightMode) {
+    targetObj = flightLockedTarget;
+  } else {
+    // Observer mode: warp to selectedPlanet
+    targetObj = selectedPlanet;
+  }
+  
+  if (!targetObj) {
+    alert("Please select a target destination before activating warp drive.");
+    return;
+  }
+  
+  // Set up warp parameters
+  warpTargetPlanetObj = targetObj;
+  isWarping = true;
+  warpProgress = 0;
+  warpStartPos.copy(camera.position);
+  
+  // Get planet position
+  const planetPos = new THREE.Vector3();
+  if (targetObj.name === 'Sun') {
+    planetPos.set(0, 0, 0);
+  } else {
+    targetObj.planet.getWorldPosition(planetPos);
+  }
+  
+  // Calculate approach offset distance based on planet type
+  let warpOffset = 30;
+  if (targetObj.name === 'Sun') warpOffset = 40;
+  else if (targetObj.name === 'Mercury' || targetObj.name === 'Pluto') warpOffset = 10;
+  else if (targetObj.name === 'Venus' || targetObj.name === 'Earth' || targetObj.name === 'Uranus') warpOffset = 25;
+  else if (targetObj.name === 'Mars') warpOffset = 15;
+  else if (targetObj.name === 'Jupiter' || targetObj.name === 'Saturn') warpOffset = 50;
+  else if (targetObj.name === 'Neptune') warpOffset = 20;
+  
+  // Find direction towards the planet
+  warpApproachDir.subVectors(planetPos, camera.position).normalize();
+  
+  // If distance is extremely small or camera is exactly at the position, pick a default direction
+  if (warpApproachDir.lengthSq() < 0.001) {
+    warpApproachDir.set(0, 0, 1);
+  }
+  
+  // Warp destination position
+  warpEndPos.copy(planetPos).addScaledVector(warpApproachDir, -warpOffset);
+  
+  // Prepare particle systems
+  warpLines.visible = true;
+  warpMaterial.opacity = 0;
+  streakScale = 1.0;
+  
+  // Store original bloom values
+  warpOriginalBloomRadius = bloomPass.radius;
+  warpOriginalBloomStrength = bloomPass.strength;
+  
+  // Hide details card and settings panel during warp if open
+  const planetInfoEl = document.getElementById('planetInfo');
+  if (planetInfoEl) planetInfoEl.classList.remove('active');
+  const settingsPanelEl = document.getElementById('settingsPanel');
+  if (settingsPanelEl) settingsPanelEl.classList.remove('active');
+};

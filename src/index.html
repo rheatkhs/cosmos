@@ -137,6 +137,7 @@
                     <span class="metric-value" id="val-moons">-</span>
                 </div>
             </div>
+            <button id="btn-warp-jump" class="hud-btn warp-btn" style="width: 100%; margin-top: 20px; font-weight: 700;" onclick="triggerWarpJump()"><i class="ri-portal-line"></i> WARP_JUMP</button>
         </div>
     </div>
 
@@ -221,6 +222,12 @@
                 <span>COORD Z:</span>
                 <span id="flight-coord-z" class="mono-value">0.00</span>
             </div>
+            <div class="divider" style="margin: 10px 0; height: 1px; background: rgba(0, 240, 255, 0.15);"></div>
+            <div class="telemetry-row">
+                <span>HYPER_LOCK:</span>
+                <span id="flight-target" class="mono-value" style="color: #ff8c00; text-shadow: 0 0 8px rgba(255, 140, 0, 0.4);">NONE</span>
+            </div>
+            <button id="btn-warp-hud" class="hud-btn warp-btn" style="width: 100%; margin-top: 8px; font-size: 11px;" onclick="triggerWarpJump()"><i class="ri-portal-line"></i> ACTIVATE_WARP</button>
         </div>
 
         <div class="flight-instructions">
@@ -234,8 +241,13 @@
             <div class="instructions-row"><span>Q / E</span><span>ROLL (TILT L/R)</span></div>
             <div class="instructions-row"><span>MOUSE DRAG</span><span>PITCH (NOSE UP/DOWN)</span></div>
             <div class="instructions-row"><span>SHIFT</span><span>BOOST THRUST</span></div>
+            <div class="instructions-row"><span>1 - 9, 0</span><span>TARGET SELECT</span></div>
+            <div class="instructions-row"><span>SPACE</span><span>TRIGGER WARP JUMP</span></div>
         </div>
     </div>
+
+    <!-- Fullscreen Warp Flash Screen Overlay -->
+    <div id="warpOverlay" class="warp-overlay"></div>
 </body>
 
 </html>

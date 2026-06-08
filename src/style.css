@@ -983,3 +983,48 @@ body.in-flight-mode .bottom-dock {
         height: 40px;
     }
 }
+
+/* =========================================
+   Hyperspace Warp Jump Design System
+   ========================================= */
+.warp-btn {
+    background: rgba(255, 140, 0, 0.12) !important;
+    border-color: #ff8c00 !important;
+    color: #ff8c00 !important;
+    box-shadow: 0 0 10px rgba(255, 140, 0, 0.2) !important;
+    transition: all 0.3s ease;
+}
+
+.warp-btn:hover:not(:disabled) {
+    background: #ff8c00 !important;
+    color: #000 !important;
+    box-shadow: 0 0 18px #ff8c00 !important;
+    text-shadow: none !important;
+}
+
+.warp-btn:disabled {
+    opacity: 0.35 !important;
+    border-color: rgba(255, 140, 0, 0.2) !important;
+    color: rgba(255, 140, 0, 0.4) !important;
+    box-shadow: none !important;
+    cursor: not-allowed;
+}
+
+/* Fullscreen Warp Transition Flash Overlay */
+.warp-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: #ffffff;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 99999;
+    transition: opacity 0.4s ease-out;
+}
+
+.warp-overlay.active-flash {
+    opacity: 1;
+    transition: opacity 0.05s ease-in;
+}
